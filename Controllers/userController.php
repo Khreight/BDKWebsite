@@ -3,6 +3,7 @@
     require_once "Model/userModel.php";
     require_once "Model/countryModel.php";
     require_once "Model/cityModel.php";
+    require_once "Model/mainModel.php";
 
     require_once "Functions/auth.php";
     require_once "Functions/mail.php";
@@ -27,6 +28,24 @@
 
 
     switch($uri) {
+
+        case "/":
+            require_once "Model/mainModel.php";
+            date_default_timezone_set('Europe/Brussels');
+
+            $latestSeason = getLatestSeason($pdo);
+            $seasonId = $latestSeason['seasonId'] ?? null;
+
+            $upcoming   = getHomepageUpcomingRaces($pdo, 6);
+            $counters   = getHomepageCounters($pdo);
+            $videos     = getHomepageLatestVideos($pdo, 3);
+            $circuits   = getHomepageCircuits($pdo, 12);
+            $winners    = getHomepageRecentWinners($pdo, 3);
+            $standings  = $seasonId ? getHomepageStandings($pdo, $seasonId, 8) : [];
+            $featured   = $seasonId ? getFeaturedDrivers($pdo, $seasonId, 8)  : [];
+
+            require_once "Views/main.php";
+        break;
         case "/register":
             if (isset($_POST["submitRegister"])) {
                 $result = verificationRegister($_POST, $pdo);
@@ -305,12 +324,25 @@
 
 
         case "/dashboard-races":
-            if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 1) {
+            if (empty($_SESSION['user']) || (int)$_SESSION['user']['role'] !== 1) {
                 header("Location: /");
                 break;
             }
+
+            require_once "Model/racesModel.php";
+            require_once "Model/circuitModel.php";
+            require_once "Model/countryModel.php";
+            require_once "Model/cityModel.php";
+
+            $countries = getAllCountries($pdo);
+            $cities    = getAllCities($pdo);             // si tu en as besoin
+            $circuits  = getAllCircuitsWithAddress($pdo);
+            $seasons   = getAllSeasons($pdo);
+            $races     = getAllRacesWithJoins($pdo);
+
             require_once "Views/admin/dashboard-races.php";
         break;
+
 
 
         case "/dashboard-poll":

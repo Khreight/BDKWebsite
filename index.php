@@ -27,6 +27,7 @@
 
 <?php
     require_once "Controllers/userController.php";
+    require_once "Controllers/raceController.php";
 
 ?>
 </body>
