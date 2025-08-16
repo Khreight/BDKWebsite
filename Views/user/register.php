@@ -248,16 +248,30 @@ $totalErrors = count($errors);
 
               <ul id="dropdownList"
                 class="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow mt-1 max-h-60 overflow-y-auto hidden">
-                <?php foreach($countries as $country): ?>
+                <?php foreach ($countries as $country): ?>
+                  <?php
+                    // Compat array/objet + fallback
+                    $id   = is_array($country) ? ($country['countryId'] ?? $country['id'] ?? '') : ($country->countryId ?? $country->id ?? '');
+                    $name = is_array($country) ? ($country['name'] ?? '') : ($country->name ?? '');
+                    $flag = is_array($country) ? ($country['flag'] ?? '') : ($country->flag ?? '');
+                    $isUrlFlag = is_string($flag) && preg_match('#^(https?://|/)#', $flag);
+                  ?>
                   <li class="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                    data-value="<?= e($country->countryId) ?>"
-                    data-flag="<?= e($country->flag) ?>"
-                    data-name="<?= e($country->name) ?>">
-                    <img src="<?= e($country->flag) ?>" alt="" class="h-5 w-auto object-contain">
-                    <span class="text-sm"><?= e($country->name) ?></span>
+                      data-value="<?= e($id) ?>"
+                      data-flag="<?= e($flag) ?>"
+                      data-name="<?= e($name) ?>">
+                    <?php if ($isUrlFlag): ?>
+                      <img src="<?= e($flag) ?>" alt="" class="h-5 w-auto object-contain">
+                    <?php elseif (!empty($flag)): ?>
+                      <span class="text-base leading-none"><?= e($flag) ?></span>
+                    <?php else: ?>
+                      <span class="inline-block h-5 w-6 rounded bg-gray-200"></span>
+                    <?php endif; ?>
+                    <span class="text-sm"><?= e($name) ?></span>
                   </li>
                 <?php endforeach; ?>
               </ul>
+
 
               <input type="hidden" name="nationality" id="nationalityInput" value="<?= e($old['nationality'] ?? '') ?>">
             </div>

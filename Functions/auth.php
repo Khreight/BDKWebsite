@@ -229,3 +229,93 @@ function disableOldTokens(PDO $pdo, int $userId, string $typeToken): void {
     $stmt = $pdo->prepare("UPDATE tokenUser SET status = 0 WHERE user = ? AND typeToken = ?");
     $stmt->execute([$userId, $typeToken]);
 }
+
+
+
+
+function verificationUpdateProfile(array $data, array $files, PDO $pdo, int $userId): array {
+    $values = [
+        'first_name'  => str_clean($data['first_name'] ?? ''),
+        'last_name'   => str_clean($data['last_name'] ?? ''),
+        'phone'       => str_clean($data['phone'] ?? ''),
+        'birthdate'   => str_clean($data['birthdate'] ?? ''),
+        'numero'      => str_clean($data['numero'] ?? ''),
+        'taille'      => str_clean($data['taille'] ?? ''),
+        'poids'       => str_clean($data['poids'] ?? ''),
+        'description' => str_clean($data['description'] ?? ''),
+        'nationality' => $data['nationality'] ?? null,  // id
+        'city'        => str_clean($data['city'] ?? ''),
+    ];
+    $errors = [];
+
+    // Noms
+    if ($values['first_name'] === '' || !is_valid_name($values['first_name'])) $errors['first_name'] = "Prénom invalide.";
+    if ($values['last_name']  === '' || !is_valid_name($values['last_name']))  $errors['last_name']  = "Nom invalide.";
+
+    // Téléphone (optionnel)
+    if ($values['phone'] !== '') {
+        if (!is_valid_phone($values['phone'])) {
+            $errors['phone'] = "Téléphone invalide.";
+        } elseif (userPhoneExistsForOther($pdo, phone_normalize($values['phone']), $userId)) {
+            $errors['phone'] = "Ce numéro est déjà utilisé.";
+        } else {
+            $values['phone'] = phone_normalize($values['phone']);
+        }
+    }
+
+    // Date de naissance (optionnelle)
+    if ($values['birthdate'] !== '' && !is_valid_birthdate($values['birthdate'])) {
+        $errors['birthdate'] = "Date de naissance invalide.";
+    }
+
+    // Numéro / taille / poids (optionnels)
+    if ($values['numero'] !== '' && !preg_match('/^\d{0,5}$/', $values['numero'])) $errors['numero'] = "Numéro invalide.";
+    if ($values['taille'] !== '' && (!ctype_digit($values['taille']) || (int)$values['taille'] > 250)) $errors['taille'] = "Taille invalide.";
+    if ($values['poids']  !== '' && (!ctype_digit($values['poids'])  || (int)$values['poids']  > 300)) $errors['poids']  = "Poids invalide.";
+    if (mb_strlen($values['description']) > 255) $errors['description'] = "Description trop longue (255 max).";
+
+    // Nationalité / Ville (id ou vide)
+    if ($values['nationality'] !== null && $values['nationality'] !== '' &&
+        filter_var($values['nationality'], FILTER_VALIDATE_INT) === false) {
+        $errors['nationality'] = "Pays invalide.";
+    } else {
+        $values['nationality'] = $values['nationality'] ? (int)$values['nationality'] : null;
+    }
+
+    // Ville (texte, optionnelle). Si fournie → format + pays requis
+    if ($values['city'] !== '') {
+        if (!is_valid_city($values['city'])) {
+            $errors['city'] = "Ville invalide (2–100 caractères).";
+        } elseif (empty($values['nationality'])) {
+            $errors['city'] = "Sélectionne un pays avant la ville.";
+        }
+    }
+
+    // Upload image (optionnel)
+    if (!empty($files['picture']) && is_uploaded_file($files['picture']['tmp_name'])) {
+        $f = $files['picture'];
+        if ($f['error'] !== UPLOAD_ERR_OK) {
+            $errors['picture'] = "Upload échoué.";
+        } elseif ($f['size'] > 4 * 1024 * 1024) {
+            $errors['picture'] = "Fichier trop volumineux (≤ 4 Mo).";
+        } else {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime  = $finfo->file($f['tmp_name']);
+            $ext = match($mime) {
+                'image/png'  => 'png',
+                'image/jpeg' => 'jpg',
+                'image/webp' => 'webp',
+                default      => null
+            };
+            if (!$ext) $errors['picture'] = "Format image invalide (jpg, png, webp).";
+            else $picture_ready_tmp = ['tmp' => $f['tmp_name'], 'ext' => $ext];
+        }
+    }
+
+    return [
+        'valid'  => empty($errors),
+        'errors' => $errors,
+        'values' => $values,
+        'picture_ready_tmp' => $picture_ready_tmp ?? null,
+    ];
+}
