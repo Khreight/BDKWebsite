@@ -609,7 +609,7 @@ function getPilotSeasonsWithRaces(PDO $pdo, int $pilotId): array
 
     // 2) Points et rang (position) du pilote pour une saison donnée
     $stPoints = $pdo->prepare("
-        SELECT point
+        SELECT points
         FROM ranking
         WHERE pilot = :pilot AND season = :season
         LIMIT 1
@@ -618,7 +618,7 @@ function getPilotSeasonsWithRaces(PDO $pdo, int $pilotId): array
         SELECT 1 + COUNT(*) AS rank_pos
         FROM ranking r2
         WHERE r2.season = :season
-          AND r2.point > :myPoints
+          AND r2.points > :myPoints
     ");
 
     // 3) Courses de la saison + place du pilote
@@ -666,7 +666,7 @@ function getPilotSeasonsWithRaces(PDO $pdo, int $pilotId): array
         // Points
         $stPoints->execute([':pilot' => $pilotId, ':season' => $seasonId]);
         $rowPoint = $stPoints->fetch(PDO::FETCH_ASSOC);
-        $points   = $rowPoint ? (int)$rowPoint['point'] : null;
+        $points   = $rowPoint ? (float)$rowPoint['points'] : null;
 
         // Rang (position) si on a des points
         $rankPos = null;

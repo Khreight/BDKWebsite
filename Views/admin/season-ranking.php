@@ -56,23 +56,38 @@ $ranking   = $ranking ?? []; // [{rankingId, point, pilotId, firstName, lastName
             </thead>
             <tbody id="rankBody" class="text-sm">
               <?php if (!empty($ranking)): ?>
-                <?php foreach ($ranking as $i => $row): ?>
+                <?php
+                  // Rang "dense" calculé dans la boucle (1,1,3… en cas d’égalité)
+                  $rank = 0; $prevPts = null; $i = 0;
+                ?>
+                <?php foreach ($ranking as $row): ?>
                   <?php
-                    $pos   = $i + 1;
-                    $rid   = (int)$row['rankingId'];
-                    $pid   = (int)$row['pilotId'];
+                    $i++;
+                    $rid   = (int)($row['rankingId'] ?? 0);
+                    $pid   = (int)($row['pilotId'] ?? 0);
                     $name  = trim(($row['lastName'] ?? '').' '.($row['firstName'] ?? ''));
-                    $pts   = (int)($row['point'] ?? 0);
+                    $pts   = (float)($row['point'] ?? 0);
+
+                    if ($prevPts === null || $pts < $prevPts) {
+                      $rank = $i;
+                      $prevPts = $pts;
+                    }
                   ?>
                   <tr class="border-t rank-row">
-                    <td class="p-3 font-medium text-slate-700">#<?= $pos ?></td>
+                    <td class="p-3 font-medium text-slate-700">#<?= $rank ?></td>
                     <td class="p-3">
                       <div class="font-medium"><?= e($name ?: ('Pilote #'.$pid)) ?></div>
                       <div class="text-xs text-slate-500">ID pilote: <?= $pid ?> — ID ranking: <?= $rid ?></div>
                     </td>
                     <td class="p-3">
-                      <input type="number" name="points[<?= $rid ?>]" value="<?= $pts ?>" min="0" step="1"
-                             class="w-28 rounded-lg border px-3 py-2 text-sm">
+                      <input
+                        type="number"
+                        name="points[<?= $rid ?>]"
+                        value="<?= e((string)$pts) ?>"
+                        min="0"
+                        step="0.1"
+                        inputmode="decimal"
+                        class="w-28 rounded-lg border px-3 py-2 text-sm">
                     </td>
                   </tr>
                 <?php endforeach; ?>

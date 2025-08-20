@@ -4,6 +4,8 @@
     require_once "Model/countryModel.php";
     require_once "Model/cityModel.php";
     require_once "Model/mainModel.php";
+    require_once "Model/racesModel.php";
+    require_once "Model/circuitModel.php";
 
     require_once "Functions/auth.php";
     require_once "Functions/mail.php";
@@ -26,6 +28,46 @@
         }
     }
 
+if (!function_exists('findCityId')) {
+  function findCityId(PDO $pdo, string $cityName, int $countryId): ?int {
+    $cityName = trim($cityName);
+    if ($cityName === '' || $countryId <= 0) return null;
+    $st = $pdo->prepare("SELECT cityId FROM city WHERE name = :n AND country = :c LIMIT 1");
+    $st->execute([':n' => $cityName, ':c' => $countryId]);
+    $id = $st->fetchColumn();
+    return $id ? (int)$id : null;
+  }
+}
+
+
+function saveUploadedProfilePicture(array $file, int $userId): string {
+    if (empty($file['tmp_name']) || (int)$file['error'] !== UPLOAD_ERR_OK) {
+        throw new RuntimeException("Aucun fichier reçu.");
+    }
+    $maxSize = 5 * 1024 * 1024; // 5 Mo
+    if ($file['size'] > $maxSize) {
+        throw new RuntimeException("Fichier trop grand (max 5 Mo).");
+    }
+    $info = @getimagesize($file['tmp_name']);
+    if ($info === false) throw new RuntimeException("Le fichier n’est pas une image valide.");
+    $allowedExt = ['jpg','jpeg','png','webp'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowedExt, true)) {
+        throw new RuntimeException("Extension invalide (jpg, jpeg, png, webp).");
+    }
+    $dirWeb  = "/Assets/ProfilesPhoto";
+    $dirFs   = rtrim($_SERVER['DOCUMENT_ROOT'], '/\\') . $dirWeb;
+    if (!is_dir($dirFs)) @mkdir($dirFs, 0775, true);
+
+    $name = "user_{$userId}_" . time() . "_" . bin2hex(random_bytes(4)) . "." . $ext;
+    if (!@move_uploaded_file($file['tmp_name'], $dirFs . "/" . $name)) {
+        throw new RuntimeException("Échec de l’upload.");
+    }
+    return $name;
+}
+
+
+
 
     switch($uri) {
 
@@ -40,12 +82,74 @@
             $counters   = getHomepageCounters($pdo);
             $videos     = getHomepageLatestVideos($pdo, 3);
             $circuits   = getHomepageCircuits($pdo, 12);
-            $winners    = getHomepageRecentWinners($pdo, 3);
-            $standings  = $seasonId ? getHomepageStandings($pdo, $seasonId, 8) : [];
+            $winners = getLatestWinners($pdo, 6);
+            $standings = getSeasonStandingsFromResults($pdo, (int)$latestSeason['seasonId']);
             $featured   = $seasonId ? getFeaturedDrivers($pdo, $seasonId, 8)  : [];
+            $latestRaces = getLatestRacesPublic($pdo, 5);
 
             require_once "Views/main.php";
         break;
+
+        case "/become-driver":
+            // Auth obligatoire
+            if (empty($_SESSION['user'])) { header("Location: /login"); break; }
+
+            // Génère un CSRF si besoin
+            if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+            $csrf = $_SESSION['csrf'];
+
+            // Récup user + contrôle rôle
+            $authId = (int)$_SESSION['user']['id'];
+            $me     = getUserByIdWithJoins($pdo, $authId);
+            if (!$me) { header("Location: /"); break; }
+
+            $role = (int)($_SESSION['user']['role'] ?? 4);
+
+            // Admin/Driver -> pas concerné
+            if (in_array($role, [1,2], true)) { header("Location: /"); break; }
+
+            // POST : l’utilisateur envoie sa demande
+            if (isset($_POST['submitRequest'])) {
+                // CSRF
+                if (!isset($_POST['_csrf']) || !hash_equals($csrf, (string)$_POST['_csrf'])) {
+                    flash_set('error', "Jeton CSRF invalide, réessaie.");
+                    header("Location: /become-driver");
+                    break;
+                }
+
+                // Seuls les rôles 4 peuvent demander (visiteur/membre non pilote)
+                if ($role !== 4) {
+                    flash_set('error', "Action non autorisée.");
+                    header("Location: /become-driver");
+                    break;
+                }
+
+                // On passe en rôle 3 (en attente) + dateRequestMember = NOW()
+                $now = (new DateTime('now'))->format('Y-m-d H:i:s');
+                updateUserProfile($pdo, $authId, [
+                    'role'              => 3,
+                    'dateRequestMember' => $now
+                ]);
+
+                // Mets à jour la session
+                $_SESSION['user']['role'] = 3;
+
+                flash_set('success', "Ta demande a bien été envoyée ! Un organisateur te recontactera.");
+                header("Location: /become-driver");
+                break;
+            }
+
+            // Prépare les infos pour la vue
+            $canRequest   = ($role === 4);
+            $isPending    = ($role === 3);
+            $requestedAt  = $me['dateRequestMember'] ?? null;
+            $success      = flash_take('success');
+            $error        = flash_take('error');
+
+            require_once "Views/user/become-driver.php";
+        break;
+
+
         case "/register":
             if (isset($_POST["submitRegister"])) {
                 $result = verificationRegister($_POST, $pdo);
@@ -53,16 +157,14 @@
                 $old    = $result['values'];
 
                 if ($result['valid']) {
-                    if(cityAlreadyExists($pdo, $old['city'], $old['nationality'])) {
-                        $cityId = getCityId($pdo, $old['city'], $old['nationality']);
-                    } else {
-                        $cityId = createCity($pdo, $old['city'], $old['nationality']);
+                    $cityId = findCityId($pdo, $old['city'], (int)$old['nationality']);
+                    if (!$cityId) {
+                        $cityId = createCity($pdo, $old['city'], (int)$old['nationality']);
                     }
 
                     $userId = createUser($pdo, $old, $cityId);
 
                     $token  = addTokenEmail($pdo, (int)$userId);
-
                     sendVerificationEmail($old['email'], $token);
 
                     flash_set('success', "Un e-mail de confirmation a été envoyé. Il est valable 15 minutes.");
@@ -368,17 +470,52 @@
 
             switch ($action) {
 
+
                 case 'see':
                     $userToSee = getUserByIdWithJoins($pdo, $targetUserId);
-                    if (!$userToSee) {
-                        header("Location: /");
-                        break;
+                    if (!$userToSee) { header("Location: /"); break; }
+
+                    // Normaliser l'id pilote
+                    $pilotId = (int)($userToSee['id'] ?? $userToSee['userId'] ?? $targetUserId);
+
+                    // Résultats groupés par saison
+                    $bySeason = getPilotResultsGroupedBySeason($pdo, $pilotId);
+
+                    // Rang & points par saison (rang dense 1,1,3…)
+                    $seasonSummaries = []; // seasonId => ['rank'=>..,'points'=>..]
+                    foreach ($bySeason as $grp) {
+                        $sid = (int)($grp['seasonId'] ?? 0);
+                        if ($sid <= 0) continue;
+
+                        $stand = getSeasonStandingsFromResults($pdo, $sid);
+                        // buildDenseRanks: retourne [pilotId => rang]
+                        $ranks = buildDenseRanks($stand, 'point', 'pilotId');
+
+                        // Chercher les points du pilote
+                        $pts = 0.0;
+                        foreach ($stand as $row) {
+                            if ((int)$row['pilotId'] === $pilotId) { $pts = (float)$row['point']; break; }
+                        }
+
+                        $seasonSummaries[$sid] = [
+                            'rank'   => $ranks[$pilotId] ?? null,
+                            'points' => $pts,
+                        ];
                     }
 
-                    $pilotId = (int)$userToSee['id'];
-                    $seasons = getPilotSeasonsWithRaces($pdo, $pilotId);
+                    // KPI profil
+                    $stats  = getPilotSummaryStats($pdo, $pilotId);
+                    $top3   = getPilotTopFinishes($pdo, $pilotId, 3);
+
+                    // Optionnel: si utilisé par la vue
+                    if (function_exists('getPilotSeasonsWithRaces')) {
+                        $seasons = getPilotSeasonsWithRaces($pdo, $pilotId);
+                    } else {
+                        $seasons = [];
+                    }
                     require_once "Views/user/profile.php";
                 break;
+
 
                 case 'upgrade-admin':
                     promoteUserToAdmin($pdo, $targetUserId);
@@ -418,6 +555,53 @@
             $authId    = (int)$_SESSION['user']['id'];
             $userToSee = getUserByIdWithJoins($pdo, $authId);
             if (!$userToSee) { header("Location: /"); break; }
+
+            // --- Soumission : changer mot de passe ---
+            if (isset($_POST['submitChangePassword'])) {
+                // CSRF
+                if (!isset($_POST['_csrf']) || !hash_equals($csrf, (string)$_POST['_csrf'])) {
+                    $errors['csrf'] = "Jeton CSRF invalide, réessaie.";
+                } else {
+                    $current = (string)($_POST['current_password'] ?? '');
+                    $pwd     = (string)($_POST['new_password'] ?? '');
+                    $pwd2    = (string)($_POST['new_password_confirm'] ?? '');
+
+                    // Règles de complexité (tu as déjà is_valid_password() côté reset)
+                    if (!is_valid_password($pwd)) {
+                        $errors['password'] = "Mot de passe invalide (min 8, au moins une lettre et un chiffre).";
+                    } elseif ($pwd !== $pwd2) {
+                        $errors['password_confirm'] = "La confirmation ne correspond pas.";
+                    } else {
+                        // Récupérer le hash actuel
+                        $st = $pdo->prepare("SELECT password FROM user WHERE userId = :id LIMIT 1");
+                        $st->execute([':id' => $authId]);
+                        $hash = $st->fetchColumn();
+
+                        if (!$hash || !password_verify($current, $hash)) {
+                            $errors['current_password'] = "Le mot de passe actuel est incorrect.";
+                        } else {
+                            // Mettre à jour
+                            $newHash = password_hash($pwd, PASSWORD_DEFAULT);
+                            updateUserPassword($pdo, $authId, $newHash);
+
+                            // Invalider les tokens de connexion persistante + cookies remember
+                            changeStatusCookies($pdo, $authId);
+                            clear_remember_cookie(); // si dispo
+
+                            flash_set('success', "Ton mot de passe a été mis à jour.");
+                            header("Location: /update-profile");
+                            exit;
+                        }
+                    }
+                }
+
+                // Charger la vue avec $errors
+                if (!isset($errors)) $errors = [];
+                $success = flash_take('success');
+                require_once "Views/user/updateProfile.php";
+                break;
+            }
+
 
             $countries = getAllCountries($pdo); // countryId, name, flag
             $cities    = getAllCities($pdo);    // id, name, country_id
@@ -512,6 +696,9 @@
 
             require_once "Views/user/updateProfile.php";
         break;
+
+
+
 
 
 

@@ -88,7 +88,7 @@ CREATE TABLE ranking (
     rankingId INT PRIMARY KEY AUTO_INCREMENT,
     pilot INT,
     season INT,
-    point INT,
+    point FLOAT,
 
     FOREIGN KEY (pilot) REFERENCES user(userId),
     FOREIGN KEY (season) REFERENCES season(seasonId)
@@ -106,9 +106,11 @@ CREATE TABLE race (
     capacity_max INT,
     registration_open DATETIME,
     registration_close DATETIME,
+    fastDriver INT,
 
     FOREIGN KEY (circuit) REFERENCES circuit(circuitId),
-    FOREIGN KEY (season) REFERENCES season(seasonId)
+    FOREIGN KEY (season) REFERENCES season(seasonId),
+    FOREIGN KEY (fastDriver) REFERENCES user(userId)
 );
 
 CREATE TABLE registration (
@@ -126,7 +128,10 @@ CREATE TABLE resultat (
     resultatId INT PRIMARY KEY AUTO_INCREMENT,
     pilot INT,
     race INT,
+    position INT,
     averageSpeed FLOAT,
+    points INT,
+    gapWithFront FLOAT,
 
     FOREIGN KEY (pilot) REFERENCES user(userId),
     FOREIGN KEY (race) REFERENCES race(raceId)
@@ -149,7 +154,8 @@ CREATE TABLE poll (
     startDate DATETIME,
     endDate DATETIME,
     video TEXT,
-    pollDate DATETIME
+    pollDate DATETIME,
+    isManyChoice BOOL
 );
 
 CREATE TABLE pollOptions (

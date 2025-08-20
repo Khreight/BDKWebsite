@@ -40,12 +40,12 @@ function getLatestSeason(PDO $pdo): ?array {
 
 function getHomepageStandings(PDO $pdo, int $seasonId, int $limit = 10): array {
     $sql = "
-      SELECT r.rankingId, r.point,
+      SELECT r.rankingId, r.points,
              u.userId, u.firstName, u.lastName, u.picture, u.numero, u.role
       FROM ranking r
       JOIN user u ON u.userId = r.pilot
       WHERE r.season = :s
-      ORDER BY r.point DESC, u.lastName ASC, u.firstName ASC
+      ORDER BY r.points DESC, u.lastName ASC, u.firstName ASC
       LIMIT :lim
     ";
     $st = $pdo->prepare($sql);

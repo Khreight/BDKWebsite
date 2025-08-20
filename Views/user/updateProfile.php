@@ -15,6 +15,9 @@ $pictureUrl = !empty($userToSee['picture'])
 <body class="bg-slate-50 min-h-screen">
 <header class="bg-indigo-600 text-white py-4">
   <div class="max-w-7xl mx-auto px-4 flex items-center justify-between">
+      <a href="/" class="inline-flex items-center rounded-lg bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">
+    ← Accueil
+  </a>
     <h1 class="text-xl font-semibold">Modifier mon profil</h1>
     <a href="/<?= (int)$userToSee['id'] ?>/see" class="px-4 py-2 rounded-lg bg-white text-indigo-700 hover:bg-slate-100">Voir mon profil</a>
   </div>
@@ -145,6 +148,31 @@ $pictureUrl = !empty($userToSee['picture'])
             </div>
             </div>
 
+            <div class="mt-6 rounded-xl border bg-white p-6 space-y-4">
+              <h2 class="text-lg font-semibold">Changer mon mot de passe</h2>
+
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                  <label class="text-sm text-slate-600">Mot de passe actuel</label>
+                  <input type="password" name="current_password" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm" autocomplete="current-password">
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600">Nouveau mot de passe</label>
+                  <input type="password" name="new_password" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm" autocomplete="new-password" placeholder="Minimum 8 caractères">
+                </div>
+                <div>
+                  <label class="text-sm text-slate-600">Confirmer le nouveau</label>
+                  <input type="password" name="new_password_confirm" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm" autocomplete="new-password">
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <button name="submitChangePassword" class="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700">
+                  Mettre à jour le mot de passe
+                </button>
+              </div>
+            </div>
+
         </div>
 
         <div class="flex justify-end gap-3 pt-2">
@@ -171,7 +199,7 @@ function rebuildCityDatalist() {
   ALL_CITIES.forEach(c => {
     if (!countryId || parseInt(c.country_id, 10) === countryId) {
       const opt = document.createElement('option');
-      opt.value = c.name; 
+      opt.value = c.name;
       cityList.appendChild(opt);
     }
   });

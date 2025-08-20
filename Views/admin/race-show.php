@@ -4,7 +4,7 @@ if (!function_exists('e')) { function e($s){ return htmlspecialchars((string)$s,
 $csrf = $_SESSION['csrf'] ?? '';
 
 function race_status(array $r): array {
-  $now = new DateTimeImmutable('now');
+  $now      = new DateTimeImmutable('now');
   $raceDate = !empty($r['date']) ? new DateTimeImmutable($r['date']) : null;
   $open     = !empty($r['registration_open']) ? new DateTimeImmutable($r['registration_open']) : null;
   $close    = !empty($r['registration_close']) ? new DateTimeImmutable($r['registration_close']) : null;
@@ -26,21 +26,35 @@ function fdate(?string $dt): string {
 }
 
 [$labelStatus, $clsStatus] = race_status($race);
-$valid = (int)($regStats['valid_count'] ?? 0);
-$wait  = (int)($regStats['waited_count'] ?? 0);
-$noval = (int)($regStats['novalid_count'] ?? 0);
-$total = (int)($regStats['total'] ?? 0);
+$valid = (int)($regStats['valide'] ?? 0);
+$wait  = (int)($regStats['waited'] ?? 0);
+$noval = (int)($regStats['no-valide'] ?? 0);
+$total = $valid + $wait + $noval;
 
 // Séparation des listes (affichage)
 $regsValid = array_values(array_filter($registrations, fn($r) => $r['status']==='valide'));
 $regsWait  = array_values(array_filter($registrations, fn($r) => $r['status']==='waited'));
 $regsNoVal = array_values(array_filter($registrations, fn($r) => $r['status']==='no-valide'));
+
+$isAdmin     = !empty($_SESSION['user']) && (int)$_SESSION['user']['role'] === 1;
+$isPast      = !empty($race['date']) && (new DateTime($race['date'])) < new DateTime('now');
+$hasResults  = isset($raceHasResults) ? (bool)$raceHasResults : false;
+$canEnterRes = $isAdmin && $isPast && !$hasResults;
+$canEditRes  = $isAdmin && $isPast &&  $hasResults;
+$raceId      = (int)$race['raceId'];
+
+// Infos pratiques
+$price = isset($race['price_cents']) && $race['price_cents'] !== null
+  ? number_format(((int)$race['price_cents'])/100, 2, ',', ' ') . ' €'
+  : '—';
+$capMin = $race['capacity_min'] !== null ? (int)$race['capacity_min'] : null;
+$capMax = $race['capacity_max'] !== null ? (int)$race['capacity_max'] : null;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Course #<?= (int)$race['raceId'] ?> — <?= e($race['circuitName']) ?></title>
+  <title>Course #<?= (int)$race['raceId'] ?> — <?= e($race['circuitName'] ?? $race['nameCircuit'] ?? '—') ?></title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -48,90 +62,112 @@ $regsNoVal = array_values(array_filter($registrations, fn($r) => $r['status']===
   <header class="bg-indigo-600 text-white">
     <div class="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
       <h1 class="text-2xl font-semibold">
-        <?= htmlspecialchars($race['circuitName'] ?? $race['nameCircuit'] ?? '—', ENT_QUOTES, 'UTF-8') ?>
+        <?= e($race['circuitName'] ?? $race['nameCircuit'] ?? '—') ?>
       </h1>
-      <a href="/dashboard-races" class="px-4 py-2 rounded-lg bg-white text-indigo-700 hover:bg-slate-100">Retour</a>
+
+      <div class="flex items-center gap-2">
+        <?php if ($canEditRes): ?>
+          <a href="/admin/races/<?= $raceId ?>/results/edit"
+            class="px-4 py-2 rounded-lg bg-white text-indigo-700 hover:bg-slate-100">
+            Modifier les résultats
+          </a>
+        <?php elseif ($canEnterRes): ?>
+          <a href="/admin/races/<?= $raceId ?>/results/new"
+            class="px-4 py-2 rounded-lg bg-white text-indigo-700 hover:bg-slate-100">
+            Saisir les résultats
+          </a>
+        <?php endif; ?>
+
+        <a href="/dashboard-races"
+          class="px-4 py-2 rounded-lg bg-white text-indigo-700 hover:bg-slate-100">
+          Retour
+        </a>
+      </div>
     </div>
   </header>
 
   <main class="mx-auto max-w-7xl p-6 space-y-8">
-    <!-- En-tête + statut -->
+    <!-- Bandeau statut + infos -->
     <section class="rounded-xl border bg-white p-5 shadow-sm">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div class="text-sm text-slate-500">Date de la course</div>
-          <div class="text-xl font-semibold"><?= e(fdate($race['date'])) ?></div>
-        </div>
-        <div>
-          <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium <?= $clsStatus ?>">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium <?= e($clsStatus) ?>">
             <?= e($labelStatus) ?>
           </span>
+          <h2 class="text-lg font-semibold">Course #<?= (int)$race['raceId'] ?></h2>
+        </div>
+
+        <div class="text-sm text-slate-600">
+          <span class="mr-4">Date course : <strong><?= e(fdate($race['date'] ?? null)) ?></strong></span>
+          <span class="mr-4">Ouverture : <strong><?= e(fdate($race['registration_open'] ?? null)) ?></strong></span>
+          <span class="mr-4">Clôture : <strong><?= e(fdate($race['registration_close'] ?? null)) ?></strong></span>
+          <span>Prix : <strong><?= e($price) ?></strong></span>
         </div>
       </div>
 
-      <div class="mt-4 grid md:grid-cols-3 gap-4">
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
         <div class="rounded-lg border p-4">
-          <div class="text-sm text-slate-500">Inscriptions</div>
-          <?php if (!empty($race['registration_open']) || !empty($race['registration_close'])): ?>
-            <div class="font-medium"><?= e(fdate($race['registration_open'])) ?> → <?= e(fdate($race['registration_close'])) ?></div>
-          <?php else: ?>
-            <div class="text-slate-400">Non défini</div>
-          <?php endif; ?>
+          <div class="text-slate-500">Capacité min.</div>
+          <div class="text-lg font-semibold"><?= $capMin !== null ? (int)$capMin : '—' ?></div>
         </div>
         <div class="rounded-lg border p-4">
-          <div class="text-sm text-slate-500">Capacité</div>
-          <div class="font-medium">
-            <?php
-              $cap = (is_null($race['capacity_min']) && is_null($race['capacity_max'])) ? '—'
-                    : (($race['capacity_min'] ?? 0).'–'.($race['capacity_max'] ?? '∞'));
-              echo e($cap);
-            ?>
+          <div class="text-slate-500">Capacité max.</div>
+          <div class="text-lg font-semibold"><?= $capMax !== null ? (int)$capMax : '—' ?></div>
+        </div>
+        <div class="rounded-lg border p-4">
+          <div class="text-slate-500">Inscriptions</div>
+          <div class="text-lg font-semibold">
+            <?= (int)($regStats['valid_count'] ?? 0) ?> validées / <?= (int)($regStats['waited_count'] ?? 0) ?> en attente (<?= (int)($regStats['total'] ?? 0) ?> total)
           </div>
         </div>
-        <div class="rounded-lg border p-4">
-          <div class="text-sm text-slate-500">Prix</div>
-          <div class="font-medium">
-            <?= is_null($race['price_cents']) ? '—' : e(number_format($race['price_cents']/100, 2, ',', ' ').' €') ?>
-          </div>
-        </div>
-      </div>
-
-      <?php if (!empty($race['description'])): ?>
-      <div class="mt-4">
-        <div class="text-sm text-slate-500 mb-1">Description</div>
-        <p class="text-slate-700"><?= nl2br(e($race['description'])) ?></p>
-      </div>
-      <?php endif; ?>
-
-      <div class="mt-4 flex flex-wrap gap-2">
-        <a href="/admin/races/<?= (int)$race['raceId'] ?>/edit"
-           onclick="event.preventDefault(); document.getElementById('editForm').submit();"
-           class="px-3 py-1.5 rounded-lg border hover:bg-slate-50">Modifier</a>
-        <form id="editForm" method="post" action="/admin/races/<?= (int)$race['raceId'] ?>/edit" class="hidden">
-          <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
-          <!-- tu peux pré-remplir via le dashboard, ici on poste juste pour router -->
-          <input type="hidden" name="circuitId" value="<?= (int)$race['circuitId'] ?>">
-          <input type="hidden" name="seasonId" value="<?= (int)$race['seasonId'] ?>">
-          <input type="hidden" name="date" value="<?= e(str_replace(' ', 'T', substr($race['date'],0,16))) ?>">
-          <input type="hidden" name="description" value="<?= e($race['description'] ?? '') ?>">
-        </form>
-
-        <form method="post" action="/admin/races/<?= (int)$race['raceId'] ?>/delete"
-              onsubmit="return confirm('Supprimer cette course ?');">
-          <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
-          <button class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50">Supprimer</button>
-        </form>
       </div>
     </section>
 
-    <!-- Vidéo (optionnel) -->
-    <?php if (!empty($race['video'])): ?>
+    <?php if (!empty($results)): ?>
+    <!-- Résultats -->
     <section class="rounded-xl border bg-white p-5 shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Vidéo</h2>
-      <video controls class="w-full max-h-[480px] rounded-lg">
-        <source src="<?= e($race['video']) ?>">
-        Votre navigateur ne supporte pas la vidéo HTML5.
-      </video>
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Résultats</h2>
+        <div class="flex gap-2">
+          <?php if ($canEditRes): ?>
+            <a href="/admin/races/<?= (int)$race['raceId'] ?>/results/edit" class="px-3 py-1.5 rounded-lg border hover:bg-slate-50">Modifier</a>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-left">
+          <thead class="bg-slate-100 text-slate-700 text-sm">
+            <tr>
+              <th class="p-3 w-14">Pos.</th>
+              <th class="p-3">Pilote</th>
+              <th class="p-3 w-36">Vitesse moy. (km/h)</th>
+              <th class="p-3 w-28">Écart (s)</th>
+              <th class="p-3 w-24">Points</th>
+            </tr>
+          </thead>
+          <tbody class="text-sm">
+            <?php foreach ($results as $r): ?>
+              <tr class="border-t">
+                <td class="p-3 font-medium">#<?= (int)$r['position'] ?></td>
+                <td class="p-3">
+                  <?php
+                    // Si ton modèle joint déjà les noms, affiche-les. Sinon fallback sur l'ID.
+                    if (!empty($r['firstName']) || !empty($r['lastName'])) {
+                      echo e(trim(($r['firstName'] ?? '').' '.($r['lastName'] ?? '')));
+                    } else {
+                      echo 'Pilote #'.(int)$r['pilotId'];
+                    }
+                  ?>
+                </td>
+                <td class="p-3"><?= $r['avg']!==null ? number_format((float)$r['avg'],2,',',' ') : '—' ?></td>
+                <td class="p-3"><?= number_format((float)($r['gap'] ?? 0),3,',',' ') ?></td>
+                <td class="p-3 font-semibold"><?= number_format((float)($r['points'] ?? 0),1,',',' ') ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
     </section>
     <?php endif; ?>
 
@@ -140,51 +176,90 @@ $regsNoVal = array_values(array_filter($registrations, fn($r) => $r['status']===
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">Inscriptions</h2>
         <div class="text-sm text-slate-600">
-          <span class="mr-3">✅ Validés: <strong><?= $valid ?></strong></span>
-          <span class="mr-3">⏳ Attente: <strong><?= $wait ?></strong></span>
-          <span>❌ Refusés: <strong><?= $noval ?></strong> — Total: <strong><?= $total ?></strong></span>
+          <span class="mr-3">✅ Validés: <strong><?= (int)($regStats['valid_count'] ?? 0) ?></strong></span>
+          <span class="mr-3">⏳ Attente: <strong><?= (int)($regStats['waited_count'] ?? 0) ?></strong></span>
+          <span>❌ Refusés: <strong><?= (int)($regStats['novalid_count'] ?? 0) ?></strong> — Total: <strong><?= (int)($regStats['total'] ?? 0) ?></strong></span>
         </div>
       </div>
 
       <div class="mt-4 grid md:grid-cols-2 gap-6">
+        <!-- Validés -->
         <div>
-          <h3 class="font-medium mb-2">✅ Validés</h3>
-          <div class="rounded-lg border overflow-hidden">
-            <table class="min-w-full text-left">
-              <thead class="bg-slate-100 text-slate-700 text-sm">
-                <tr><th class="p-3">Pilote</th><th class="p-3 w-48">Date</th></tr>
-              </thead>
-              <tbody class="text-sm">
-                <?php foreach ($regsValid as $r): ?>
-                  <tr class="border-t">
-                    <td class="p-3"><?= e(($r['lastName']??'').' '.($r['firstName']??'')) ?></td>
-                    <td class="p-3"><?= e(fdate($r['date'] ?? '')) ?></td>
-                  </tr>
-                <?php endforeach; ?>
-                <?php if (empty($regsValid)): ?>
-                  <tr><td class="p-4 text-slate-500" colspan="2">Aucun.</td></tr>
-                <?php endif; ?>
-              </tbody>
-            </table>
-          </div>
-        </div>
+  <h3 class="font-medium mb-2">✅ Validés</h3>
+    <div class="rounded-lg border overflow-hidden">
+      <table class="min-w-full text-left">
+        <thead class="bg-emerald-100 text-emerald-800 text-sm">
+          <tr>
+            <th class="p-3">Pilote</th>
+            <th class="p-3 w-48">Date</th>
+            <th class="p-3 w-40 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          <?php foreach ($regsValid as $r): ?>
+            <tr class="border-t bg-emerald-50">
+              <td class="p-3 font-medium text-emerald-900">
+                <?= e(trim(($r['lastName']??'').' '.($r['firstName']??''))) ?>
+              </td>
+              <td class="p-3 text-emerald-900"><?= e(fdate($r['date'] ?? '')) ?></td>
+              <td class="p-3">
+                <div class="flex justify-end">
+                  <form method="post" action="/admin/races/<?= $raceId ?>/registrations/<?= (int)$r['registrationId'] ?>/kick" class="inline">
+                    <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
+                    <button class="px-3 py-1.5 text-xs rounded bg-rose-600 text-white hover:bg-rose-700" title="Retirer ce participant">
+                      Kick
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          <?php if (empty($regsValid)): ?>
+            <tr><td class="p-4 text-slate-500" colspan="3">Aucun.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
+
+        <!-- En attente (avec actions) -->
         <div>
           <h3 class="font-medium mb-2">⏳ En attente</h3>
           <div class="rounded-lg border overflow-hidden">
             <table class="min-w-full text-left">
               <thead class="bg-slate-100 text-slate-700 text-sm">
-                <tr><th class="p-3">Pilote</th><th class="p-3 w-48">Date</th></tr>
+                <tr>
+                  <th class="p-3">Pilote</th>
+                  <th class="p-3 w-40">Date</th>
+                  <th class="p-3 w-56 text-right">Actions</th>
+                </tr>
               </thead>
               <tbody class="text-sm">
                 <?php foreach ($regsWait as $r): ?>
                   <tr class="border-t">
-                    <td class="p-3"><?= e(($r['lastName']??'').' '.($r['firstName']??'')) ?></td>
+                    <td class="p-3"><?= e(trim(($r['lastName']??'').' '.($r['firstName']??''))) ?></td>
                     <td class="p-3"><?= e(fdate($r['date'] ?? '')) ?></td>
+                    <td class="p-3">
+                      <div class="flex justify-end gap-2">
+                        <form method="post" action="/admin/races/<?= $raceId ?>/registrations/<?= (int)$r['registrationId'] ?>/approve" class="inline">
+                          <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
+                          <button class="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" title="Valider cette inscription">
+                            Valider
+                          </button>
+                        </form>
+                        <form method="post" action="/admin/races/<?= $raceId ?>/registrations/<?= (int)$r['registrationId'] ?>/reject" class="inline">
+                          <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
+                          <button class="px-3 py-1.5 text-xs rounded bg-rose-600 text-white hover:bg-rose-700" title="Refuser cette inscription">
+                            Refuser
+                          </button>
+                        </form>
+                      </div>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
                 <?php if (empty($regsWait)): ?>
-                  <tr><td class="p-4 text-slate-500" colspan="2">Aucun.</td></tr>
+                  <tr><td class="p-4 text-slate-500" colspan="3">Aucune demande en attente.</td></tr>
                 <?php endif; ?>
               </tbody>
             </table>
@@ -198,12 +273,15 @@ $regsNoVal = array_values(array_filter($registrations, fn($r) => $r['status']===
         <div class="rounded-lg border overflow-hidden">
           <table class="min-w-full text-left">
             <thead class="bg-slate-100 text-slate-700 text-sm">
-              <tr><th class="p-3">Pilote</th><th class="p-3 w-48">Date</th></tr>
+              <tr>
+                <th class="p-3">Pilote</th>
+                <th class="p-3 w-48">Date</th>
+              </tr>
             </thead>
             <tbody class="text-sm">
               <?php foreach ($regsNoVal as $r): ?>
                 <tr class="border-t">
-                  <td class="p-3"><?= e(($r['lastName']??'').' '.($r['firstName']??'')) ?></td>
+                  <td class="p-3"><?= e(trim(($r['lastName']??'').' '.($r['firstName']??''))) ?></td>
                   <td class="p-3"><?= e(fdate($r['date'] ?? '')) ?></td>
                 </tr>
               <?php endforeach; ?>
@@ -212,6 +290,33 @@ $regsNoVal = array_values(array_filter($registrations, fn($r) => $r['status']===
         </div>
       </div>
       <?php endif; ?>
+
+      <?php if (!empty($eligibleSeasonPilots)): ?>
+        <section class="rounded-xl border bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Ajouter un participant (pilotes de la saison)</h2>
+          </div>
+          <form method="post" action="/admin/races/<?= $raceId ?>/registrations/add" class="mt-4 flex flex-col sm:flex-row gap-3">
+            <input type="hidden" name="_csrf" value="<?= e($csrf) ?>">
+            <select name="userId" class="border rounded-lg p-2 flex-1">
+              <?php foreach ($eligibleSeasonPilots as $p): ?>
+                <option value="<?= (int)$p['id'] ?>">
+                  <?= e(trim(($p['lastName']??'').' '.($p['firstName']??''))) ?><?= $p['numero'] ? ' — #'.e($p['numero']) : '' ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <button class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+              Valider directement
+            </button>
+          </form>
+        </section>
+        <?php else: ?>
+        <section class="rounded-xl border bg-white p-5 shadow-sm">
+          <h2 class="text-lg font-semibold">Ajouter un participant</h2>
+          <p class="mt-2 text-sm text-slate-600">Aucun pilote de la saison à ajouter (soit tous sont déjà en attente/validés, soit la saison n’a pas de participants).</p>
+        </section>
+      <?php endif; ?>
+
     </section>
   </main>
 </body>

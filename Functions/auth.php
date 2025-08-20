@@ -2,6 +2,23 @@
 
 require_once "Model/userModel.php";
 
+// Functions/auth.php
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+function ensure_admin_or_redirect(): void {
+    if (empty($_SESSION['user']) || (int)($_SESSION['user']['role'] ?? 0) !== 1) {
+        header("Location: /"); exit;
+    }
+}
+
+    function ensure_csrf(): string {
+        if (empty($_SESSION['csrf'])) {
+            $_SESSION['csrf'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf'];
+    }
+
+
 function verificationRegister($data, $pdo): array {
     $values = [
         'first_name'        => str_clean($data['first_name'] ?? ''),
