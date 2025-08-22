@@ -1,6 +1,6 @@
 <?php
 
-require_once "Model/userModel.php";
+require_once __DIR__ . "/../Model/userModel.php";
 
 // Functions/auth.php
 if (session_status() === PHP_SESSION_NONE) session_start();

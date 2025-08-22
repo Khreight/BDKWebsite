@@ -56,7 +56,7 @@ function flash_take(string $key): ?string {
     return $msg;
 }
 
-require_once "Config/databaseConnexion.php";
+require_once "../app/Config/databaseConnexion.php";
 
 /* ✅ on rafraîchit la session user à CHAQUE requête, sans changer ta structure */
 if (!empty($_SESSION['user']['id'])) {
@@ -75,9 +75,9 @@ if (!empty($_SESSION['user']['id'])) {
 
 <?php
     // on garde tes contrôleurs ici
-    require_once "Controllers/pollController.php";
-    require_once "Controllers/userController.php";
-    require_once "Controllers/raceController.php";
+    require_once "../app/Controllers/pollController.php";
+    require_once "../app/Controllers/userController.php";
+    require_once "../app/Controllers/raceController.php";
 
     ob_end_flush(); // ✅ on envoie tout à la fin (headers OK jusque-là)
 ?>

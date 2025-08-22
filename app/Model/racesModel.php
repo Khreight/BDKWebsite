@@ -29,6 +29,42 @@ function getUserRegistrationStatus(PDO $pdo, int $raceId, int $userId): ?string 
     return $v !== false ? (string)$v : null;
 }
 
+function getUpcomingRacesAll(PDO $pdo, int $limit = 6): array {
+    $sql = "
+      SELECT
+        rc.raceId,
+        rc.date,
+        rc.description,
+        rc.price_cents,
+        rc.capacity_max,
+        rc.registration_open,
+        rc.registration_close,
+        s.year        AS seasonYear,
+        c.nameCircuit AS circuitName,
+        ci.name       AS cityName,
+        co.name       AS countryName,
+        /* compteur participants (valide + en attente), juste pour info si tu veux tag 'Complet' */
+        (
+          SELECT COUNT(*) FROM registration rg
+          WHERE rg.race = rc.raceId AND rg.status IN ('waited','valide')
+        ) AS regCount
+      FROM race rc
+      LEFT JOIN season  s  ON s.seasonId  = rc.season
+      LEFT JOIN circuit c  ON c.circuitId = rc.circuit
+      LEFT JOIN address a  ON a.addressId = c.address
+      LEFT JOIN city    ci ON ci.cityId   = a.city
+      LEFT JOIN country co ON co.countryId= ci.country
+      WHERE rc.date >= NOW()
+      ORDER BY rc.date ASC
+      LIMIT :lim
+    ";
+    $st = $pdo->prepare($sql);
+    $st->bindValue(':lim', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+
 function getSeasonById(PDO $pdo, int $seasonId): ?array {
     $st = $pdo->prepare("SELECT seasonId, year FROM season WHERE seasonId = :id");
     $st->execute([':id'=>$seasonId]);
@@ -64,12 +100,12 @@ function deleteSeason(PDO $pdo, int $seasonId): void {
 /* ======== RANKING (classement / points) ======== */
 function getSeasonRanking(PDO $pdo, int $seasonId): array {
     $sql = "
-        SELECT r.rankingId, r.pilot AS pilotId, r.point,
+        SELECT r.rankingId, r.pilot AS pilotId, r.points,
                u.firstName, u.lastName, u.email
         FROM ranking r
         JOIN user u ON u.userId = r.pilot
         WHERE r.season = :s
-        ORDER BY r.point DESC, u.lastName ASC, u.firstName ASC
+        ORDER BY r.points DESC, u.lastName ASC, u.firstName ASC
     ";
     $st = $pdo->prepare($sql);
     $st->execute([':s'=>$seasonId]);

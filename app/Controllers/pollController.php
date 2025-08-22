@@ -1,7 +1,7 @@
 <?php
 // Controllers/pollController.php
-require_once "Model/pollModel.php";
-require_once "Functions/auth.php";
+require_once __DIR__ . '/../Model/pollModel.php';
+require_once __DIR__ . "/../Functions/auth.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 
@@ -57,7 +57,7 @@ switch ($uri) {
         ensure_admin_or_redirect_polls();
         $csrf  = csrf_poll();
         $polls = getAllPolls($pdo); // avec total des votes
-        require_once "Views/admin/polls/index.php";
+        require_once __DIR__ . "/../Views/admin/polls/index.php";
         break;
 
     /* ===== ADMIN: Formulaire création ===== */
@@ -68,7 +68,7 @@ switch ($uri) {
         $poll     = [];
         $options  = [];
         $circuits = getSimpleCircuits($pdo);
-        require_once "Views/admin/polls/form.php";
+        require_once __DIR__ . "/../Views/admin/polls/form.php";
         break;
 
     /* ===== ADMIN: Création (POST) ===== */
@@ -132,7 +132,7 @@ switch ($uri) {
             $poll     = compact('title','description','pollType','startDate','endDate','isManyChoice');
             $options  = $optionsIn;
             $circuits = getSimpleCircuits($pdo);
-            require_once "Views/admin/polls/form.php";
+            require_once __DIR__ . "/../Views/admin/polls/form.php";
             break;
         }
 
@@ -169,7 +169,7 @@ switch ($uri) {
             $mode     = 'edit';
             $options  = $poll['options'];
             $circuits = getSimpleCircuits($pdo);
-            require_once "Views/admin/polls/form.php";
+            require_once __DIR__ . "/../Views/admin/polls/form.php";
             exit;
         }
 
@@ -313,7 +313,7 @@ switch ($uri) {
             $poll   = getPollById($pdo, $pollId);
             if (!$poll) { flash_set('error', "Sondage introuvable."); header("Location:/admin/polls"); exit; }
             $groups = getPollVoters($pdo, $pollId);
-            require_once "Views/admin/polls/voters.php";
+            require_once __DIR__ . "/../Views/admin/polls/voters.php";
             exit;
         }
 
@@ -346,7 +346,7 @@ switch ($uri) {
             foreach ($polls as $pp) foreach ($pp['options'] as $oo) $allOptIds[] = (int)$oo['id'];
             $votersByOpt = getVotersForOptions($pdo, $allOptIds);
 
-            require_once "Views/polls/index.php";
+            require_once __DIR__ . "/../Views/polls/index.php";
             exit;
         }
 if (preg_match('#^/polls/(\d+)/vote$#', $uri, $m)) {

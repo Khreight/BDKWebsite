@@ -1,14 +1,14 @@
 <?php
 
-    require_once "Model/userModel.php";
-    require_once "Model/countryModel.php";
-    require_once "Model/cityModel.php";
-    require_once "Model/mainModel.php";
-    require_once "Model/racesModel.php";
-    require_once "Model/circuitModel.php";
+    require_once __DIR__ . '/../Model/userModel.php';
+    require_once __DIR__ . "/../Model/countryModel.php";
+    require_once __DIR__ . "/../Model/cityModel.php";
+    require_once __DIR__ . "/../Model/mainModel.php";
+    require_once __DIR__ . "/../Model/racesModel.php";
+    require_once __DIR__ . "/../Model/circuitModel.php";
 
-    require_once "Functions/auth.php";
-    require_once "Functions/mail.php";
+    require_once __DIR__ . "/../Functions/auth.php";
+    require_once __DIR__ . "/../Functions/mail.php";
 
     $uri = $_SERVER["REQUEST_URI"];
 
@@ -72,22 +72,39 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
     switch($uri) {
 
         case "/":
-            require_once "Model/mainModel.php";
+            require_once __DIR__ . "/../Model/mainModel.php";
             date_default_timezone_set('Europe/Brussels');
 
             $latestSeason = getLatestSeason($pdo);
             $seasonId = $latestSeason['seasonId'] ?? null;
 
-            $upcoming   = getHomepageUpcomingRaces($pdo, 6);
             $counters   = getHomepageCounters($pdo);
             $videos     = getHomepageLatestVideos($pdo, 3);
             $circuits   = getHomepageCircuits($pdo, 12);
             $winners = getLatestWinners($pdo, 6);
-            $standings = getSeasonStandingsFromResults($pdo, (int)$latestSeason['seasonId']);
+            $all = getPublicRaces($pdo);
+            $now = new DateTimeImmutable('now');
+
+            $upcoming = array_values(array_filter($all, function($r) use ($now) {
+                if (empty($r['date'])) return false;
+                try { return new DateTimeImmutable($r['date']) >= $now; }
+                catch (Throwable) { return false; }
+            }));
+
+            usort($upcoming, fn($a,$b) => strcmp($a['date'] ?? '', $b['date'] ?? ''));
+            $upcoming = array_slice($upcoming, 0, 6);
+
+            $seasonId = (int)($latestSeason['seasonId'] ?? 0);
+            if ($seasonId === 0) {
+                $standings = [];
+            } else {
+                $standings = getSeasonStandingsFromResults($pdo, $seasonId);
+            }
+
             $featured   = $seasonId ? getFeaturedDrivers($pdo, $seasonId, 8)  : [];
             $latestRaces = getLatestRacesPublic($pdo, 5);
 
-            require_once "Views/main.php";
+            require_once __DIR__ . "/../Views/main.php";
         break;
 
         case "/become-driver":
@@ -146,7 +163,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             $success      = flash_take('success');
             $error        = flash_take('error');
 
-            require_once "Views/user/become-driver.php";
+            require_once __DIR__ . "/../Views/user/become-driver.php";
         break;
 
 
@@ -178,7 +195,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             if (!isset($errors)) $errors = [];
             if (!isset($old))    $old    = [];
 
-            require_once "Views/user/register.php";
+            require_once __DIR__ . "/../Views/user/register.php";
         break;
 
 
@@ -217,7 +234,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             if (!isset($errors)) $errors = [];
             if (!isset($old))    $old    = [];
 
-            require_once "Views/user/login.php";
+            require_once __DIR__ . "/../Views/user/login.php";
         break;
 
 
@@ -297,7 +314,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             $error   = flash_take('error');
             $success = flash_take('success');
 
-            require_once "Views/user/resend_confirmation.php";
+            require_once __DIR__ . "/../Views/user/resend_confirmation.php";
         break;
 
 
@@ -338,7 +355,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
 
             $error   = flash_take('error');
             $success = flash_take('success');
-            require_once "Views/user/password_forget.php";
+            require_once __DIR__ . "/../Views/user/password_forget.php";
         break;
 
 
@@ -358,7 +375,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
 
                 $error   = flash_take('error');
                 $success = flash_take('success');
-                require_once "Views/user/password_reset.php";
+                require_once __DIR__ . "/../Views/user/password_reset.php";
                 break;
             }
 
@@ -402,7 +419,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
                 header("Location: /");
                 break;
             }
-            require_once "Views/admin/dashboard.php";
+            require_once __DIR__ . "/../Views/admin/dashboard.php";
         break;
 
 
@@ -420,7 +437,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             $offset = ($page - 1) * $perPage;
             $users = getUsersWithJoins($pdo, $perPage, $offset, $q);
 
-            require_once "Views/admin/dashboard-member.php";
+            require_once __DIR__ . "/../Views/admin/dashboard-member.php";
         break;
 
 
@@ -431,10 +448,10 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
                 break;
             }
 
-            require_once "Model/racesModel.php";
-            require_once "Model/circuitModel.php";
-            require_once "Model/countryModel.php";
-            require_once "Model/cityModel.php";
+            require_once __DIR__ . "/../Model/racesModel.php";
+            require_once __DIR__ . "/../Model/circuitModel.php";
+            require_once __DIR__ . "/../Model/countryModel.php";
+            require_once __DIR__ . "/../Model/cityModel.php";
 
             $countries = getAllCountries($pdo);
             $cities    = getAllCities($pdo);             // si tu en as besoin
@@ -442,7 +459,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             $seasons   = getAllSeasons($pdo);
             $races     = getAllRacesWithJoins($pdo);
 
-            require_once "Views/admin/dashboard-races.php";
+            require_once __DIR__ . "/../Views/admin/dashboard-races.php";
         break;
 
 
@@ -452,7 +469,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
                 header("Location: /");
                 break;
             }
-            require_once "Views/admin/dashboard-poll.php";
+            require_once __DIR__ . "/../Views/admin/dashboard-poll.php";
         break;
 
 
@@ -513,7 +530,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
                     } else {
                         $seasons = [];
                     }
-                    require_once "Views/user/profile.php";
+                    require_once __DIR__ . "/../Views/user/profile.php";
                 break;
 
 
@@ -598,7 +615,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
                 // Charger la vue avec $errors
                 if (!isset($errors)) $errors = [];
                 $success = flash_take('success');
-                require_once "Views/user/updateProfile.php";
+                require_once __DIR__ . "/../Views/user/updateProfile.php";
                 break;
             }
 
@@ -694,7 +711,7 @@ function saveUploadedProfilePicture(array $file, int $userId): string {
             if (!isset($errors)) $errors = [];
             $success = flash_take('success');
 
-            require_once "Views/user/updateProfile.php";
+            require_once __DIR__ . "/../Views/user/updateProfile.php";
         break;
 
 

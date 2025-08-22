@@ -1,12 +1,12 @@
 <?php
 // Controllers/raceController.php
 
-require_once "Model/racesModel.php";
-require_once "Model/circuitModel.php";
-require_once "Model/countryModel.php";
-require_once "Model/cityModel.php";
-require_once "Model/userModel.php";
-require_once "Functions/auth.php";
+require_once __DIR__ . "/../Model/racesModel.php";
+require_once __DIR__ . "/../Model/circuitModel.php";
+require_once __DIR__ . "/../Model/countryModel.php";
+require_once __DIR__ . "/../Model/cityModel.php";
+require_once __DIR__ . "/../Model/userModel.php";
+require_once __DIR__ . "/../Functions/auth.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 
@@ -25,6 +25,8 @@ function csrf_races(): string {
     if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
     return $_SESSION['csrf'];
 }
+
+
 
 /** City ensure */
 function ensureCityId(PDO $pdo, string $cityName, int $countryId): int {
@@ -62,7 +64,7 @@ switch ($uri) {
         $circuits  = getAllCircuitsWithAddress($pdo);
         $seasons   = getAllSeasons($pdo);
         $races     = getAllRacesWithJoins($pdo);
-        require_once "Views/admin/dashboard-races.php";
+        require_once __DIR__ . "/../Views/admin/dashboard-races.php";
         break;
 
     /* ====================== CIRCUITS ==================== */
@@ -71,7 +73,7 @@ switch ($uri) {
         $csrf = ensure_csrf();
         $countries = getAllCountries($pdo);
         $circuit = []; $mode='create';
-        require_once "Views/admin/circuit-form.php";
+        require_once __DIR__ . "/../Views/admin/circuit-form.php";
         break;
 
     case "/admin/circuits/create":
@@ -109,7 +111,7 @@ switch ($uri) {
         ensure_admin_or_redirect();
         $csrf = ensure_csrf();
         $season = []; $mode='create';
-        require_once "Views/admin/season-form.php";
+        require_once __DIR__ . "/../Views/admin/season-form.php";
         break;
 
     case "/admin/seasons/create":
@@ -161,7 +163,7 @@ switch ($uri) {
         usort($closed, fn($a,$b)=>strcmp($b['date'] ?? '', $a['date'] ?? ''));
         $otherRaces = array_merge($early, $closed); // ⬅️ inscriptions expirées tout en bas
 
-        require_once "Views/races/index.php";
+        require_once __DIR__ . "/../Views/races/index.php";
         break;
 
     /* ======================== RACES (admin/new) ========= */
@@ -171,7 +173,7 @@ switch ($uri) {
         $circuits = getAllCircuitsWithAddress($pdo);
         $seasons  = getAllSeasons($pdo);
         $race=[]; $mode='create';
-        require_once "Views/admin/race-form.php";
+        require_once __DIR__ . "/../Views/admin/race-form.php";
         break;
 
     case "/admin/races/create":
@@ -222,7 +224,7 @@ switch ($uri) {
             $results         = getRaceResultsWithLaps($pdo, $raceId);
             $eligibleSeasonPilots = getEligibleSeasonPilotsForRace($pdo, (int)$race['seasonId'], $raceId);
 
-            require_once "Views/admin/race-show.php";
+            require_once __DIR__ . "/../Views/admin/race-show.php";
             exit;
         }
 
@@ -237,7 +239,7 @@ switch ($uri) {
 
             $countries = getAllCountries($pdo);
             $mode = 'edit';
-            require_once "Views/admin/circuit-form.php";
+            require_once __DIR__ . "/../Views/admin/circuit-form.php";
             exit;
         }
 
@@ -385,7 +387,7 @@ switch ($uri) {
             $allSeasons       = getAllSeasons($pdo);
 
             $csrf = csrf_races(); // si ta vue l’utilise
-            require_once "Views/public/season-ranking.php";
+            require_once __DIR__ . "/../Views/public/season-ranking.php";
             exit;
         }
 
@@ -418,7 +420,7 @@ switch ($uri) {
             // liste des inscrits pour affichage
             $registrations = getRaceRegistrations($pdo, $raceId);
 
-            require_once "Views/public/race-details.php";
+            require_once __DIR__ . "/../Views/public/race-details.php";
             exit;
         }
 
@@ -475,7 +477,7 @@ switch ($uri) {
             $circuits = getAllCircuitsWithAddress($pdo);
             $seasons  = getAllSeasons($pdo);
             $mode='edit';
-            require_once "Views/admin/race-form.php";
+            require_once __DIR__ . "/../Views/admin/race-form.php";
             exit;
         }
         if (preg_match('#^/admin/races/(\d+)/update$#', $uri, $m)) {
@@ -528,7 +530,7 @@ switch ($uri) {
             $seasonId     = (int)($race['seasonId'] ?? 0);
             $participants = getSeasonParticipants($pdo, $seasonId);
             $defaultRows  = count($participants);
-            require_once "Views/admin/race-results-form.php";
+            require_once __DIR__ . "/../Views/admin/race-results-form.php";
             exit;
         }
         if (preg_match('#^/admin/races/(\d+)/results/save$#', $uri, $m)) {
@@ -615,7 +617,7 @@ switch ($uri) {
             usort($existing, fn($a,$b)=>((int)$a['position'])<=>((int)$b['position']));
             $defaultRows  = max(count($participants), count($existing));
             $mode = 'edit';
-            require_once "Views/admin/race-results-form.php";
+            require_once __DIR__ . "/../Views/admin/race-results-form.php";
             exit;
         }
         if (preg_match('#^/admin/races/(\d+)/results/update$#', $uri, $m)) {
@@ -687,7 +689,7 @@ switch ($uri) {
             $season = getSeasonById($pdo, $seasonId);
             if (!$season) { flash_set('error', "Saison introuvable."); header("Location: /dashboard-races"); exit; }
             $mode='edit';
-            require_once "Views/admin/season-form.php";
+            require_once __DIR__ . "/../Views/admin/season-form.php";
             exit;
         }
         if (preg_match('#^/admin/seasons/(\d+)/update$#', $uri, $m)) {
@@ -722,7 +724,7 @@ switch ($uri) {
             if (!$season) { flash_set('error', "Saison introuvable."); header("Location: /dashboard-races"); exit; }
             $ranking  = getSeasonRanking($pdo, $seasonId);
             $csrf     = ensure_csrf();
-            require_once "Views/admin/season-ranking.php";
+            require_once __DIR__ . "/../Views/admin/season-ranking.php";
             exit;
         }
         if (preg_match('#^/admin/seasons/(\d+)/ranking/save$#', $uri, $m)) {
@@ -762,7 +764,7 @@ switch ($uri) {
                 $attached = getSeasonRanking($pdo, $seasonId);
                 $attachedIds = array_map(fn($r) => (int)$r['pilotId'], $attached);
                 $csrf = ensure_csrf();
-                require_once "Views/admin/season-attach-drivers.php";
+                require_once __DIR__ . "/../Views/admin/season-attach-drivers.php";
                 exit;
             }
 

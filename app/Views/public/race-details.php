@@ -24,6 +24,20 @@ function fnum($n, int $dec = 3): string {
   return number_format((float)$n, $dec, ',', ' ');
 }
 
+function formatGap($gap, int $pos = null): string {
+    if ($pos === 1) return 'LEADER';
+    if ($gap === null || $gap === '') return '—';
+
+    if (abs($gap - round($gap)) < 1e-9) {
+        $laps = (int)round($gap);
+        if($laps == 0) return 'LEADER';
+        return '+' . $laps . ' tour' . ($laps > 1 ? 's' : '');
+    }
+    return '+' . fnum($gap, 3) . 's';
+}
+
+
+
 // Y a-t-il des résultats ?
 $hasResults = !empty($results);
 
@@ -145,7 +159,7 @@ if ($hasResults) {
                   <td class="p-3 font-medium">#<?= $pos ?></td>
                   <td class="p-3"><?= e($pilotName) ?></td>
                   <td class="p-3"><?= $avg !== null ? fnum($avg, 2) : '—' ?></td>
-                  <td class="p-3"><?= fnum($gap, 3) ?></td>
+                  <td class="p-3"><?= e(formatGap($gap)) ?></td>
                   <td class="p-3">
                     <?php if (empty($laps)): ?>
                       <span class="text-slate-500">—</span>

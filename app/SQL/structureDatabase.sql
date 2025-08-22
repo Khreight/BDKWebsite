@@ -88,7 +88,7 @@ CREATE TABLE ranking (
     rankingId INT PRIMARY KEY AUTO_INCREMENT,
     pilot INT,
     season INT,
-    point FLOAT,
+    points FLOAT,
 
     FOREIGN KEY (pilot) REFERENCES user(userId),
     FOREIGN KEY (season) REFERENCES season(seasonId)
@@ -130,7 +130,7 @@ CREATE TABLE resultat (
     race INT,
     position INT,
     averageSpeed FLOAT,
-    points INT,
+    points FLOAT,
     gapWithFront FLOAT,
 
     FOREIGN KEY (pilot) REFERENCES user(userId),

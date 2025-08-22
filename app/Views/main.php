@@ -67,13 +67,26 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
 </head>
 <body class="min-h-screen bg-slate-50">
 
+<header class="bg-black flex items-center justify-center text-white h-12">
+  <p>Le site est en phase de test</p>
+</header>
+
+
 <!-- Header -->
 <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-    <a href="/" class="flex items-center gap-2 font-bold text-lg">
-      <img src="/Assets/Logo/logo.png" alt="<?= e($siteName) ?>" width="auto" height="50" class="h-10 w-35 object-cover" loading="eager" decoding="async" />
-    </a>
 
+    <!-- Logos rapprochés -->
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center">
+        <img src="/Assets/Logo/logo.png" alt="<?= e($siteName) ?>" class="h-10 object-cover" loading="eager" decoding="async" />
+      </a>
+      <a href="https://www.ebisu.brussels/fr/">
+        <img src="/Assets/Logo/logo_ebisu.png" alt="Logo EBISU" class="h-10 object-cover" loading="eager" decoding="async" />
+      </a>
+    </div>
+
+    <!-- Navigation -->
     <nav class="hidden md:flex items-center gap-6 text-sm text-slate-700">
       <?php if (!$isLoggedIn): ?>
         <a href="/login" class="hover:text-indigo-600">Connexion</a>
@@ -99,6 +112,7 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
   </div>
 </header>
 
+
 <!-- Hero -->
 <section class="relative isolate">
   <div class="absolute inset-0 -z-10">
@@ -112,6 +126,7 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
       </div>
       <h1 class="mt-4 text-3xl sm:text-5xl font-extrabold leading-tight">L'unique compétition sourde au Karting en Belgique</h1>
       <p class="mt-4 text-slate-200 max-w-2xl">Inscriptions, classements, circuits, résultats et sondages : TOUT le championnat, au même endroit.</p>
+      <h6>Organisé par l'asbl EBISU</h4>
       <div class="mt-6 flex flex-wrap gap-3">
         <a href="/register" class="rounded-lg bg-indigo-600 px-5 py-3 font-medium hover:bg-indigo-700">Devenir pilote</a>
         <a href="#calendrier" class="rounded-lg border border-white/30 px-5 py-3 font-medium hover:bg-white/10">Voir le calendrier</a>
@@ -142,46 +157,79 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
   </div>
 </section>
 
-<!-- Upcoming races -->
 <section id="calendrier" class="py-12 border-y bg-white">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between">
       <h2 class="text-xl font-semibold">Prochaines courses</h2>
     </div>
+
     <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <?php foreach ($upcoming as $r): ?>
-        <?php $phase = race_phase($r); ?>
-        <a href="/races/<?= (int)($r['raceId'] ?? $r['id'] ?? 0) ?>" class="group block rounded-xl border bg-white hover:shadow-md transition overflow-hidden">
+        <?php
+          $phase = race_phase($r);
+
+          // Détection "complet" robuste (selon ce que ton contrôleur renvoie)
+          $isFull = false;
+          if (array_key_exists('capacity_max', $r) && $r['capacity_max'] !== null) {
+            if (array_key_exists('regCount', $r)) {
+              $isFull = (int)$r['regCount'] >= (int)$r['capacity_max'];
+            } elseif (array_key_exists('isFull', $r)) {
+              $isFull = (bool)$r['isFull'];
+            }
+          }
+
+          $raceId = (int)($r['raceId'] ?? $r['id'] ?? 0);
+        ?>
+
+        <a href="/races/<?= $raceId ?>" class="group block rounded-xl border bg-white hover:shadow-md transition overflow-hidden">
           <div class="p-5">
             <div class="flex items-center justify-between gap-3">
               <div class="text-sm text-slate-500"><?= e($r['seasonYear'] ?? '') ?></div>
-              <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium <?= e($phase['class']) ?>">
-                <?= e($phase['label']) ?>
-              </span>
+
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium <?= e($phase['class']) ?>">
+                  <?= e($phase['label']) ?>
+                </span>
+                <?php if ($isFull): ?>
+                  <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 border-slate-200">
+                    Complet
+                  </span>
+                <?php endif; ?>
+              </div>
             </div>
+
             <div class="mt-1 text-lg font-semibold"><?= e($r['circuitName'] ?? 'Circuit') ?></div>
             <div class="text-sm text-slate-600">
-              <?= e(trim(($r['cityName'] ?? '').((($r['countryName'] ?? '') !== '') ? ', '.$r['countryName'] : ''))) ?>
+              <?= e(trim(($r['cityName'] ?? '').(((string)($r['countryName'] ?? '') !== '') ? ', '.$r['countryName'] : ''))) ?>
             </div>
+
             <div class="mt-3 flex items-center justify-between text-sm">
               <div class="text-slate-700">Course: <span class="font-medium"><?= human_date($r['date'] ?? null) ?></span></div>
               <div class="text-slate-700">Prix: <span class="font-medium"><?= euro_price($r['price_cents'] ?? null) ?></span></div>
             </div>
+
             <?php if (!empty($r['registration_open']) || !empty($r['registration_close'])): ?>
               <div class="mt-2 text-xs text-slate-500">
                 Inscriptions: <?= human_date($r['registration_open'] ?? null) ?> → <?= human_date($r['registration_close'] ?? null) ?>
               </div>
             <?php endif; ?>
           </div>
-          <div class="border-t bg-slate-50 px-5 py-3 text-sm text-indigo-700 group-hover:bg-indigo-50">Voir la course →</div>
+
+          <div class="border-t bg-slate-50 px-5 py-3 text-sm text-indigo-700 group-hover:bg-indigo-50">
+            Voir la course →
+          </div>
         </a>
       <?php endforeach; ?>
+
       <?php if (empty($upcoming)): ?>
-        <div class="col-span-full rounded-xl border p-8 text-center text-slate-500">Aucune course planifiée pour le moment.</div>
+        <div class="col-span-full rounded-xl border p-8 text-center text-slate-500">
+          Aucune course planifiée pour le moment.
+        </div>
       <?php endif; ?>
     </div>
   </div>
 </section>
+
 
 <!-- Standings + Winners -->
 <section class="py-12">
@@ -231,10 +279,17 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
               <tr class="border-t">
                 <td class="p-3 font-medium"><?= $rank ?></td>
                 <td class="p-3">
-                  <div class="flex items-center gap-3">
-                    <img src="/Assets/ProfilesPhoto/<?= e(($row['picture'] ?? '') ?: 'default.png') ?>" class="h-8 w-8 rounded-full object-cover" alt="" loading="lazy">
-                    <div><?= e(trim(($row['firstName'] ?? '').' '.($row['lastName'] ?? ''))) ?></div>
-                  </div>
+                  <a href="/<?= (int)($row['pilotId'] ?? 0) ?>/see" class="group flex items-center gap-3">
+                    <img
+                      src="/Assets/ProfilesPhoto/<?= e(($row['picture'] ?? '') ?: 'default.png') ?>"
+                      class="h-8 w-8 rounded-full object-cover group-hover:ring-2 group-hover:ring-indigo-500 group-hover:ring-offset-2"
+                      alt=""
+                      loading="lazy"
+                    >
+                    <span class="group-hover:underline">
+                      <?= e(trim(($row['firstName'] ?? '').' '.($row['lastName'] ?? ''))) ?>
+                    </span>
+                  </a>
                 </td>
                 <td class="p-3"><?= e($row['numero'] ?? '—') ?></td>
                 <td class="p-3 font-semibold"><?= number_format((float)($row['point'] ?? 0), 1, ',', ' ') ?></td>
@@ -381,6 +436,77 @@ $role       = (int)($_SESSION['user']['role'] ?? 0);
     </div>
   </div>
 </section>
+
+
+
+<?php
+/* --- (Optionnel) Données images EBISU : remplace les chemins/captions par les tiens --- */
+$ebisuGallery = $ebisuGallery ?? [
+  ['src'=>'/Assets/Ebisu/ebisu_1.png', 'alt'=>'Participants EBISU au volley-ball', 'caption'=>"Evenement volley-ball EBISU"],
+  ['src'=>'/Assets/Ebisu/ebisu_2.png', 'alt'=>'Tournoi de UNO', 'caption'=>"Photo finale du tournoi UNO"],
+  ['src'=>'/Assets/Ebisu/ebisu_3.png', 'alt'=>"Photo de groupe au karting", 'caption'=>"Photo finale du groupe au karting"],
+  ['src'=>'/Assets/Ebisu/ebisu_4.png', 'alt'=>'Projection du film JESUS, a deaf mission', 'caption'=>"Photo du film"],
+];
+?>
+<!-- À propos d'EBISU (version enrichie) -->
+<section class="py-16 bg-white border-t" id="a-propos-ebisu">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 items-center">
+    <!-- Texte -->
+    <div>
+      <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-medium border border-indigo-100">
+        Association organisatrice
+      </div>
+      <h2 class="mt-3 text-2xl md:text-3xl font-extrabold text-slate-900">À propos d’EBISU</h2>
+      <p class="mt-4 text-slate-600 leading-relaxed">
+        EBISU est une <strong>ASBL bruxelloise</strong> dédiée au bien-être
+        <strong>matériel, culturel et social des personnes sourdes et malentendantes</strong>.
+        Elle organise des <strong>activités sportives, sociales et culturelles</strong> inclusives
+        et est l’organisatrice officielle du <strong>championnat sourd de karting en Belgique</strong>.
+      </p>
+      <ul class="mt-4 space-y-2 text-slate-700">
+        <li class="flex gap-3"><span class="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span><span>Événements accessibles (briefings LSF, encadrement adapté)</span></li>
+        <li class="flex gap-3"><span class="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span><span>Rencontres conviviales et esprit de communauté</span></li>
+        <li class="flex gap-3"><span class="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span><span>Promotion du sport et de l’inclusion</span></li>
+      </ul>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://www.ebisu.brussels/fr/" target="_blank" rel="noopener"
+           class="rounded-lg bg-indigo-600 text-white px-5 py-3 font-medium hover:bg-indigo-700">Découvrir EBISU</a>
+      </div>
+    </div>
+
+    <!-- Collage images (hero EBISU) -->
+    <div class="grid grid-cols-3 gap-3">
+      <div class="col-span-2 aspect-video overflow-hidden rounded-xl">
+        <img src="<?= e($ebisuGallery[0]['src'] ?? '/Assets/placeholder-wide.jpg') ?>"
+             alt="<?= e($ebisuGallery[0]['alt'] ?? 'Image EBISU') ?>"
+             class="h-full w-full object-cover hover:scale-105 transition"
+             loading="lazy" decoding="async">
+      </div>
+      <div class="aspect-square overflow-hidden rounded-xl">
+        <img src="<?= e($ebisuGallery[1]['src'] ?? '/Assets/placeholder.jpg') ?>"
+             alt="<?= e($ebisuGallery[1]['alt'] ?? 'Image EBISU') ?>"
+             class="h-full w-full object-cover hover:scale-105 transition"
+             loading="lazy" decoding="async">
+      </div>
+      <div class="aspect-square overflow-hidden rounded-xl">
+        <img src="<?= e($ebisuGallery[2]['src'] ?? '/Assets/placeholder.jpg') ?>"
+             alt="<?= e($ebisuGallery[2]['alt'] ?? 'Image EBISU') ?>"
+             class="h-full w-full object-cover hover:scale-105 transition"
+             loading="lazy" decoding="async">
+      </div>
+      <div class="col-span-2 aspect-video overflow-hidden rounded-xl">
+        <img src="<?= e($ebisuGallery[3]['src'] ?? '/Assets/placeholder-wide.jpg') ?>"
+             alt="<?= e($ebisuGallery[3]['alt'] ?? 'Image EBISU') ?>"
+             class="h-full w-full object-cover hover:scale-105 transition"
+             loading="lazy" decoding="async">
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
 
 <!-- CTA -->
 <section class="py-14">
